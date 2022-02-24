@@ -215,30 +215,16 @@ add_new_routes() {
 add_new_resolv_conf() {
 	$LOGGER "Creating resolv.conf"
 
-	if [ -f "/tmp/${interface}_nameserver" ]; then
-		# Remove old entries
-		for nameserver in $(cat /tmp/${interface}_nameserver); do
-			route delete $nameserver >/dev/null 2>&1
-		done
-	fi
+	ARGS="-i ${interface} -4nd"
+	for nameserver in ${new_domain_name_servers}; do
+		ARGS="${ARGS} -a ${nameserver}"
+	done
 
-	rm -f /tmp/${interface}_nameserver
+	/usr/local/opnsense/scripts/interfaces/nameserver.sh ${ARGS}
 
-	if [ -n "$new_domain_name_servers" ]; then
-		for nameserver in $new_domain_name_servers; do
-			# Add a route to the nameserver out the correct interface
-			# so that mulitple wans work correctly with multiple dns
-			# also backup the nameserver for later route removal
-			echo $nameserver >> /tmp/${interface}_nameserver
-			route add $nameserver -iface $interface
-		done
-	fi
+	ARGS="-i ${interface} -4sd ${new_domain_name:+"-a ${new_domain_name}"}"
 
-	rm -f /tmp/${interface}_searchdomain
-
-	if [ -n "$new_domain_name" ]; then
-		echo $new_domain_name > /tmp/${interface}_searchdomain
-	fi
+	/usr/local/opnsense/scripts/interfaces/nameserver.sh ${ARGS}
 
 	return 0
 }
