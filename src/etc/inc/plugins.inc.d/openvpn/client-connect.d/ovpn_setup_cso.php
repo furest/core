@@ -27,6 +27,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+//This file is supposed to run only in server_tls and p2p_tls modes.
+$run_modes = ["server_tls", "p2p_tls"];
+
+if (!in_array($argv[2], $run_modes))
+{
+    exit(0);
+}
+
+
 require_once("config.inc");
 require_once("util.inc");
 require_once("plugins.inc.d/openvpn.inc");
@@ -38,14 +47,26 @@ $vpnid = filter_var($argv[1], FILTER_SANITIZE_NUMBER_INT);
 if (isset($config['openvpn']['openvpn-server'])) {
     foreach ($config['openvpn']['openvpn-server'] as $server) {
         if ("{$server['vpnid']}" === "$vpnid") {
+            //If in p2p_tls and subnet is smaller than /30 then quit.
+            if (!isset($server['tunnel_network']) || empty($server['tunnel_network']))
+            {
+                exit(0);
+            }
+            list($srv_ip, $srv_masklen) = explode('/', $server['tunnel_network']);
+            if($server['mode'] == "p2p_tls" && $masklen >=30)
+            {
+                exit(0);
+            }
+
+
             $all_cso = openvpn_fetch_csc_list();
             if (!empty($all_cso[$vpnid][$common_name])) {
                 $cso = $all_cso[$vpnid][$common_name];
             } else {
                 $cso = array("common_name" => $common_name);
             }
-            // $argv[2] contains the temporary file used for the profile specified by client-connect
-            $cso_filename = openvpn_csc_conf_write($cso, $server, $argv[2]);
+            // $argv[3] contains the temporary file used for the profile specified by client-connect
+            $cso_filename = openvpn_csc_conf_write($cso, $server, $argv[3]);
             if (!empty($cso_filename)) {
                 syslog(LOG_NOTICE, "client config created @ {$cso_filename}");
             }
